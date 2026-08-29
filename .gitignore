@@ -216,3 +216,11 @@ __marimo__/
 
 # Streamlit
 .streamlit/secrets.toml
+
+# PH Job Market Pipeline data and charts outputs
+data/raw/*.json
+!data/raw/.gitkeep
+charts/*.png
+!charts/.gitkeep
+*.db
+
