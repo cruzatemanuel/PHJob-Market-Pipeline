@@ -1,6 +1,6 @@
 # PH Job Market Analytics Pipeline — Full Detailed Build Guide
 
-**Ship date:** September 19, 2026 (Week 5) · **Repo:** `ph-job-market-pipeline`
+**Repo:** `ph-job-market-pipeline` (5-Week Build)
 
 This is the code-level companion to the phase overview: every file you need to write, filled in, per phase. Copy, adapt the TODOs, ship.
 
@@ -8,11 +8,11 @@ This is the code-level companion to the phase overview: every file you need to w
 - [Prerequisites](#prerequisites)
 - [Repository Structure](#repository-structure)
 - [Phase 0 — Data Source Decision](#phase-0--data-source-decision-recap)
-- [Phase 1 (Wk1, Aug 17–23) — Foundation](#phase-1-wk1-aug-1723--foundation)
-- [Phase 2 (Wk2, Aug 24–30) — Extract](#phase-2-wk2-aug-2430--extract)
-- [Phase 3 (Wk3, Aug 31–Sep 6) — Transform + Load](#phase-3-wk3-aug-31sep-6--transform--load)
-- [Phase 4 (Wk4, Sep 7–13) — Analyze + Visualize](#phase-4-wk4-sep-713--analyze--visualize)
-- [Phase 5 (Sep 14–19) — Polish + Ship](#phase-5-sep-1419--polish--ship)
+- [Phase 1 (Week 1) — Foundation](#phase-1-week-1--foundation)
+- [Phase 2 (Week 2) — Extract](#phase-2-week-2--extract)
+- [Phase 3 (Week 3) — Transform + Load](#phase-3-week-3--transform--load)
+- [Phase 4 (Week 4) — Analyze + Visualize](#phase-4-week-4--analyze--visualize)
+- [Phase 5 (Week 5) — Polish + Ship](#phase-5-week-5--polish--ship)
 - [Appendix A — Troubleshooting](#appendix-a--troubleshooting)
 - [Appendix B — Risk Reminders](#appendix-b--risk-reminders)
 
@@ -25,7 +25,7 @@ This is the code-level companion to the phase overview: every file you need to w
 - **This is the same core stack as PhilWeather v2** (Python, pandas, PostgreSQL, SQLAlchemy, matplotlib, GitHub) — Docker is the one piece coming back from v1 here, added deliberately for environment reproducibility, not scope creep. Web scraping and a real branching workflow are the two genuinely new skills this project proves.
 - Since you're already running Claude Code, you can hand it each phase's section below as a task directly — the code blocks are written to be implemented as-is, not just read.
 
-**Timing flag worth checking now:** your semester runs a 17-week structure with synchronized Prelim/Midterm/Final weeks, and Week 4–5 of this build (Sep 7–19) is roughly when Prelims tend to land. Pull up your actual exam schedule before committing to the Week 4 date — if Prelims overlap, front-load Phase 4's SQL queries earlier (they don't depend on anything in Phase 4 beyond a loaded database) so Sep 14–19 is polish-only, not a scramble.
+**Timing flag worth checking now:** your semester runs a 17-week structure with synchronized Prelim/Midterm/Final weeks, and Week 4–5 of this build is roughly when Prelims tend to land. Pull up your actual exam schedule before committing to the Week 4 date — if Prelims overlap, front-load Phase 4's SQL queries earlier (they don't depend on anything in Phase 4 beyond a loaded database) so Week 5 is polish-only, not a scramble.
 
 ---
 
@@ -62,7 +62,7 @@ Lock this before Week 1. JobStreet PH is JS-rendered and ToS-restricted — Kali
 
 ---
 
-## Phase 1 (Wk1, Aug 17–23) — Foundation
+## Phase 1 (Week 1) — Foundation
 
 ### `.gitignore`
 ```gitignore
@@ -191,7 +191,7 @@ Suggested branch per phase: `feature/db-schema` (Wk1) → `feature/scraper` (Wk2
 
 ---
 
-## Phase 2 (Wk2, Aug 24–30) — Extract
+## Phase 2 (Week 2) — Extract
 
 **Timebox: 3 days.** If your chosen source isn't yielding results by day 3, fall back to Phase 0's smaller-sample plan — don't let this phase eat Week 3.
 
@@ -313,7 +313,7 @@ if __name__ == "__main__":
 
 ---
 
-## Phase 3 (Wk3, Aug 31–Sep 6) — Transform + Load
+## Phase 3 (Week 3) — Transform + Load
 
 ### `src/transform_load.py`
 ```python
@@ -555,7 +555,7 @@ if __name__ == "__main__":
 
 ---
 
-## Phase 4 (Wk4, Sep 7–13) — Analyze + Visualize
+## Phase 4 (Week 4) — Analyze + Visualize
 
 ### `queries/analysis.sql`
 ```sql
@@ -725,7 +725,7 @@ if __name__ == "__main__":
 
 ---
 
-## Phase 5 (Sep 14–19) — Polish + Ship
+## Phase 5 (Week 5) — Polish + Ship
 
 ### `README.md`
 ```markdown
@@ -811,4 +811,4 @@ Then pin the repo on your GitHub profile.
 - **Week 2 scraper fragility** is still the single biggest point of failure — the 3-day timebox exists to protect Week 3, not to be optional.
 - **Industry field for Query 4** needs real values in `INDUSTRY_LOOKUP` — it defaults to `'Unclassified'`, which will make Query 4 boring if you forget to populate it after Week 2.
 - **Salary parsing** is a heuristic (`parse_salary`), not a guarantee — spot-check a handful of rows against the raw JSON before trusting Query 2 and 4's numbers.
-- **Exam-week overlap** — see the timing flag under Prerequisites. Check your actual Prelim schedule against Sep 7–19 now, not in Week 4.
+- **Exam-week overlap** — see the timing flag under Prerequisites. Check your actual Prelim schedule against Week 4–5 now, not during execution.
