@@ -40,7 +40,7 @@ ph-job-market-pipeline/
   - [ ] Step 0.1: Select Primary Data Source & Plan Fallback
   - [x] Step 0.2: Directory Scaffolding & Initial Git Repo Setup
 - [ ] **Phase 1: Foundation (Environment, Docker & Database Schema)**
-  - [ ] Step 1.1: Create `.gitignore`
+  - [x] Step 1.1: Create `.gitignore`
   - [ ] Step 1.2: Create `.env.example` & `.env`
   - [ ] Step 1.3: Define `requirements.txt` & Setup Virtual Environment
   - [ ] Step 1.4: Define `docker-compose.yml` for PostgreSQL 16
