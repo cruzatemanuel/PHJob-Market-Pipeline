@@ -38,7 +38,7 @@ ph-job-market-pipeline/
 
 - [ ] **Phase 0: Project Setup & Data Source Decision**
   - [ ] Step 0.1: Select Primary Data Source & Plan Fallback
-  - [ ] Step 0.2: Directory Scaffolding & Initial Git Repo Setup
+  - [x] Step 0.2: Directory Scaffolding & Initial Git Repo Setup
 - [ ] **Phase 1: Foundation (Environment, Docker & Database Schema)**
   - [ ] Step 1.1: Create `.gitignore`
   - [ ] Step 1.2: Create `.env.example` & `.env`
