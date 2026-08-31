@@ -88,7 +88,7 @@ POSTGRES_USER=ph_job_market_user
 POSTGRES_PASSWORD=changeme
 POSTGRES_DB=ph_job_market
 POSTGRES_HOST=localhost
-POSTGRES_PORT=5432
+POSTGRES_PORT=5433
 ```
 
 ### `requirements.txt`
@@ -118,7 +118,7 @@ services:
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
       POSTGRES_DB: ${POSTGRES_DB}
     ports:
-      - "5432:5432"
+      - "5433:5432"
     volumes:
       - pgdata:/var/lib/postgresql/data
       - ./db/schema.sql:/docker-entrypoint-initdb.d/schema.sql

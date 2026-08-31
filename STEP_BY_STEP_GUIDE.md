@@ -108,7 +108,7 @@ ph-job-market-pipeline/
   POSTGRES_PASSWORD=changeme
   POSTGRES_DB=ph_job_market
   POSTGRES_HOST=localhost
-  POSTGRES_PORT=5432
+  POSTGRES_PORT=5433
   ```
 
 #### Step 1.3: Define Dependencies & Setup Python Virtual Environment
@@ -132,7 +132,7 @@ ph-job-market-pipeline/
 
 #### Step 1.4: Define Docker Compose Service
 - **File**: `docker-compose.yml`
-- **Action**: Configure PostgreSQL 16 container, port mapping `5432:5432`, volume persistence `pgdata`, and mount `./db/schema.sql` to `/docker-entrypoint-initdb.d/schema.sql`.
+- **Action**: Configure PostgreSQL 16 container, port mapping `5433:5432` (to avoid the local PostgreSQL service on port 5432), volume persistence `pgdata`, and mount `./db/schema.sql` to `/docker-entrypoint-initdb.d/schema.sql`.
 
 #### Step 1.5: Create Database DDL (`db/schema.sql`)
 - **File**: `db/schema.sql`
