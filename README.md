@@ -1,6 +1,6 @@
 # Philippine Job Market Data Engineering Pipeline
 
-[![Python Version](https://img.shields.io/badge/Python-3.9%2B-blue.svg)](https.python.org)
+[![Python Version](https://img.shields.io/badge/Python-3.9--3.12-blue.svg)](https.python.org)
 [![Database](https://img.shields.io/badge/Database-PostgreSQL%20%7C%20SQLite-indigo.svg)](https://www.postgresql.org/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 
@@ -53,7 +53,7 @@ ph-job-market-pipeline/
 
 ### 1. Prerequisites
 
-- Python 3.9 or higher
+- Python 3.9–3.12 (the pinned Playwright and PostgreSQL driver releases do not support Python 3.13)
 - Docker & Docker Compose (Optional, for PostgreSQL container)
 
 ### 2. Environment Setup
@@ -64,9 +64,9 @@ Clone the repository and install Python dependencies:
 git clone https://github.com/cruzatemanuel/PHJob-Market-Pipeline.git
 cd PHJob-Market-Pipeline
 
-# Create and activate virtual environment (optional)
-python3 -m venv venv
-source venv/bin/activate  # On Windows: venv\Scripts\activate
+# Create and activate virtual environment
+python3 -m venv .venv
+source .venv/bin/activate  # On Windows: .venv\Scripts\activate
 
 # Install requirements
 pip install -r requirements.txt

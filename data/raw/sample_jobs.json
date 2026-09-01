@@ -1,0 +1,132 @@
+[
+  {
+    "title": "Data Analyst | Emerging Technologies",
+    "company": "Questronix Corporation",
+    "location": "Makati, Philippines",
+    "salary_raw": null,
+    "posted_raw": "2 months ago",
+    "source_url": "manual://kalibrr/questronix-corporation/data-analyst-emerging-technologies",
+    "raw_description": "Collect, clean, and preprocess data from various sources. Perform exploratory data analysis, develop dashboards and reports, and conduct statistical analysis. Requires at least 2 years of data-analysis experience and proficiency in SQL, Python, or R. Experience with Tableau, Power BI, or matplotlib is preferred. Job level: Mid-Senior Level.",
+    "source": "Kalibrr manual sample"
+  },
+  {
+    "title": "Data Analyst No Experience Required",
+    "company": "Peroptyx Limited",
+    "location": "Quezon, Philippines",
+    "salary_raw": null,
+    "posted_raw": "30 days ago",
+    "source_url": "manual://kalibrr/peroptyx-limited/data-analyst-no-experience-required",
+    "raw_description": "Evaluate mapping data, verify business names and opening hours, and validate route accuracy for digital mapping applications. This is a remote, part-time independent-contractor role for applicants with no experience required. Requires English proficiency, research skills, local knowledge of the Philippines, and an analytical mindset. Job level: Entry Level.",
+    "source": "Kalibrr manual sample"
+  },
+  {
+    "title": "Data Architect [Data Lakehouse]",
+    "company": "NCS Philippines Inc.",
+    "location": "Taguig, Philippines",
+    "salary_raw": null,
+    "posted_raw": "2 months ago",
+    "source_url": "manual://kalibrr/ncs-philippines-inc/data-architect-data-lakehouse",
+    "raw_description": "Design and govern enterprise data-lakehouse architecture, data-integration pipelines, data-governance standards, and analytics-ready platforms. Requires experience with Databricks, Delta Lake, Apache Iceberg, AWS, Azure, or GCP; distributed processing with Apache Spark; streaming with Kafka; and advanced SQL and Python or Scala. Job level: Mid-Senior Level.",
+    "source": "Kalibrr manual sample"
+  },
+  {
+    "title": "Data Engineer {Data Governance}",
+    "company": "NCS Philippines Inc.",
+    "location": "Taguig, Philippines",
+    "salary_raw": null,
+    "posted_raw": "8 months ago",
+    "source_url": "manual://kalibrr/ncs-philippines-inc/data-engineer-data-governance",
+    "raw_description": "Maintain master-data information, data standards, synchronization processes, and data-governance policies. Support data quality, data security and privacy, data validation, reconciliation, and data visualization. Requires at least 2 years of experience in data governance or a regulated data environment. Job level: Mid-Senior Level.",
+    "source": "Kalibrr manual sample"
+  },
+  {
+    "title": "Data Architect {Data Landscape & Lakehouse}",
+    "company": "NCS Philippines Inc.",
+    "location": "Taguig, Philippines",
+    "salary_raw": null,
+    "posted_raw": "5 months ago",
+    "source_url": "manual://kalibrr/ncs-philippines-inc/data-architect-data-landscape-lakehouse",
+    "raw_description": "Design and evolve enterprise data-lakehouse architecture, batch and real-time ingestion pipelines, governance standards, and analytics and AI/ML workloads. Requires Databricks, Delta Lake, Apache Iceberg, AWS, Azure, or GCP; Apache Spark; Kafka; and advanced SQL and Python or Scala. Job level: Mid-Senior Level.",
+    "source": "Kalibrr manual sample"
+  },
+  {
+    "title": "Data Engineer",
+    "company": "Questronix Corporation",
+    "location": "Taguig, Philippines",
+    "salary_raw": null,
+    "posted_raw": "13 days ago",
+    "source_url": "manual://kalibrr/questronix-corporation/data-engineer-ibm-datastage",
+    "raw_description": "Design, develop, and maintain data-integration and ETL processes using IBM DataStage. Develop and optimize ETL jobs, Oracle Database 19c queries, data structures, data validation, troubleshooting, and performance tuning. Requires 3 to 5 years of data-engineering, ETL-development, or data-integration experience and strong SQL skills. Job level: Mid-Senior Level.",
+    "source": "Kalibrr manual sample"
+  },
+  {
+    "title": "Data Administration Agent",
+    "company": "DHL Express (Philippines) Corporation",
+    "location": "Parañaque, Philippines",
+    "salary_raw": null,
+    "posted_raw": "12 days ago",
+    "source_url": "manual://kalibrr/dhl-express-philippines-corporation/data-administration-agent",
+    "raw_description": "Prepare and validate shipment records and customs-clearance documentation, correct shipment data, coordinate handovers, and provide administrative support. Requires proficiency in Microsoft Office including Excel, strong English communication, planning, and analytical problem-solving. Job level: Entry Level.",
+    "source": "Kalibrr manual sample"
+  },
+  {
+    "title": "Data Engineer {Python, SQL}",
+    "company": "NCS Philippines Inc.",
+    "location": "Taguig, Philippines",
+    "salary_raw": null,
+    "posted_raw": "2 months ago",
+    "source_url": "manual://kalibrr/ncs-philippines-inc/data-engineer-python-sql",
+    "raw_description": "Build scalable data pipelines and data models. Requires Python, Java, pandas, Spark, ETL processes, SQL and NoSQL query languages, and big-data tools including MongoDB, Hive, Snowflake, and Redshift. Familiarity with AWS, Azure, GCP, Tableau, Power BI, Matplotlib, data governance, and data quality is preferred. Job level: Mid-Senior Level.",
+    "source": "Kalibrr manual sample"
+  },
+  {
+    "title": "Software Architect",
+    "company": "LeapFroggr Inc.",
+    "location": "Manila, Philippines",
+    "salary_raw": null,
+    "posted_raw": "8 months ago",
+    "source_url": "manual://kalibrr/leapfroggr-inc/software-architect",
+    "raw_description": "Design healthcare software solutions and lead a cross-functional development team. Requires experience with SQL databases including Microsoft SQL Server, NoSQL databases such as MongoDB, Node.js, TypeScript, C#, ASP.NET, VueJS, and React Native. Job level: Mid-Senior Level.",
+    "source": "Kalibrr manual sample"
+  },
+  {
+    "title": "Software Engineer | Emerging Technologies",
+    "company": "Questronix Corporation",
+    "location": "Makati, Philippines",
+    "salary_raw": null,
+    "posted_raw": "30 days ago",
+    "source_url": "manual://kalibrr/questronix-corporation/software-engineer-emerging-technologies",
+    "raw_description": "Build and maintain web and mobile applications using React.js, React Native, Node.js, and Python. Develop RESTful and GraphQL APIs, integrate third-party services, and work with PostgreSQL, MySQL, and MongoDB. Requires familiarity with CI/CD, Docker, Kubernetes, and Git-based version control. Job level: Mid-Senior Level.",
+    "source": "Kalibrr manual sample"
+  },
+  {
+    "title": "Lead Data Engineer",
+    "company": "NCS Philippines Inc.",
+    "location": "Taguig, Philippines",
+    "salary_raw": null,
+    "posted_raw": "3 months ago",
+    "source_url": "manual://kalibrr/ncs-philippines-inc/lead-data-engineer",
+    "raw_description": "Lead data engineers and design high-performance ETL and ELT pipelines, data-lake, data-warehouse, and streaming solutions. Implement data-quality checks, governance, validation, and cloud platforms. Requires AWS, Azure, or GCP; Apache Spark, Kafka, Airflow, DBT; SQL and NoSQL; Python; and 7 to 8 years of data-engineering experience. Job level: Mid-Senior Level.",
+    "source": "Kalibrr manual sample"
+  },
+  {
+    "title": "Sr. Data Engineer",
+    "company": "NCS Philippines Inc.",
+    "location": "Taguig, Philippines",
+    "salary_raw": null,
+    "posted_raw": "3 months ago",
+    "source_url": "manual://kalibrr/ncs-philippines-inc/sr-data-engineer",
+    "raw_description": "Develop automated data pipelines and technical design specifications. Implement monitoring, data-quality validation, data governance, testing, and complex automated pipelines using Apache Spark, Talend, Kafka, Airflow, NiFi, and Hadoop. Requires Python, SQL, Databricks or Snowflake, and Azure or AWS experience. Job level: Mid-Senior Level.",
+    "source": "Kalibrr manual sample"
+  },
+  {
+    "title": "Financial Analyst",
+    "company": "Greenfield Development Corporation",
+    "location": "Mandaluyong, Philippines",
+    "salary_raw": null,
+    "posted_raw": "3 months ago",
+    "source_url": "manual://kalibrr/greenfield-development-corporation/financial-analyst",
+    "raw_description": "Generate accurate accounting schedules, financial statements, and financial reports. Support business units by recording financial transactions and monitoring performance against revenue budgets. Requires a Finance, Accountancy, or Banking degree and at least 4 years of relevant experience.",
+    "source": "Kalibrr manual sample"
+  }
+]
