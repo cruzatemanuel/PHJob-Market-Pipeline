@@ -96,6 +96,34 @@ Run the scraper module to fetch raw job listings and save a snapshot in `data/ra
 python src/scrape.py --mode mock --count 50
 ```
 
+For live collection, complete selector calibration first and keep the
+source-specific settings in a local JSON file. The URL must contain `{page}` and
+the `job_card`, `title`, `company`, and `link` selectors must match the chosen
+portal:
+
+```json
+{
+  "source_name": "Chosen PH job portal",
+  "listing_url_template": "https://portal.example/jobs?q=data&page={page}",
+  "selectors": {
+    "job_card": ".actual-job-card",
+    "title": ".actual-title",
+    "company": ".actual-company",
+    "location": ".actual-location",
+    "salary": ".actual-salary",
+    "posted": ".actual-posted-date",
+    "link": "a.actual-job-link",
+    "description": ".actual-description"
+  }
+}
+```
+
+After checking the portal's terms and robots policy, run:
+
+```bash
+.venv/bin/python src/scrape.py --mode live --config path/to/portal.json --count 50
+```
+
 ### Step 2: Transform & Load (ETL)
 Parse the raw JSON snapshot, clean fields, extract skill keywords, and load records into the database:
 

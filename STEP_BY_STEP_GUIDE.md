@@ -49,7 +49,7 @@ ph-job-market-pipeline/
   - [ ] Step 1.7: Git Commit & Merge `feature/db-schema`
 - [ ] **Phase 2: Extract (Web Scraper)**
   - [ ] Step 2.1: Install Playwright & Chromium Browser Engine
-  - [ ] Step 2.2: Implement `src/scrape.py` with Anti-Blocking Defenses
+  - [x] Step 2.2: Implement `src/scrape.py` with mock mode, defensive extraction, and polite rate limits
   - [ ] Step 2.3: Inspect Target DOM & Calibrate Selectors
   - [ ] Step 2.4: Execute Scraper & Save Raw Data to `data/raw/`
   - [ ] Step 2.5: Verify Raw Data Integrity
