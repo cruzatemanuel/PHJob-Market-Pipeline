@@ -1,0 +1,26 @@
+{
+  "name": "phjob-market-pipeline",
+  "version": "1.0.0",
+  "description": "[![Python Version](https://img.shields.io/badge/Python-3.9--3.12-blue.svg)](https.python.org) [![Database](https://img.shields.io/badge/Database-PostgreSQL%20%7C%20SQLite-indigo.svg)](https://www.postgresql.org/) [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)",
+  "main": "index.js",
+  "directories": {
+    "test": "tests"
+  },
+  "scripts": {},
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/cruzatemanuel/PHJob-Market-Pipeline.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "commonjs",
+  "bugs": {
+    "url": "https://github.com/cruzatemanuel/PHJob-Market-Pipeline/issues"
+  },
+  "homepage": "https://github.com/cruzatemanuel/PHJob-Market-Pipeline#readme",
+  "devDependencies": {
+    "@playwright/test": "^1.62.1",
+    "@types/node": "^26.4.1"
+  }
+}
