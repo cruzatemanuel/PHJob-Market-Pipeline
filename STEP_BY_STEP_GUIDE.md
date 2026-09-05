@@ -1,6 +1,6 @@
 # PH Job Market Analytics Pipeline — Step-by-Step Execution Guide
 
-> **Project Goal**: Build an end-to-end Data Engineering pipeline that scrapes Philippine tech job postings, cleans and normalizes raw data, loads it into a PostgreSQL relational data warehouse, performs SQL analytics, and outputs data visualizations.
+> **Project Goal**: Build an end-to-end Data Engineering pipeline that retrieves Philippine tech job postings through official APIs, cleans and normalizes raw data, loads it into a PostgreSQL relational data warehouse, performs SQL analytics, and outputs data visualizations.
 >
 > **Target Duration**: 5 Weeks
 
@@ -18,11 +18,11 @@ ph-job-market-pipeline/
 ├── docker-compose.yml        # PostgreSQL 16 service definition
 ├── requirements.txt          # Python dependencies
 ├── data/
-│   └── raw/                  # Scraped JSON snapshots (gitignored)
+│   └── raw/                  # API JSON snapshots (gitignored)
 ├── db/
 │   └── schema.sql            # DDL for companies, job_postings, skills, job_skills
 ├── src/
-│   ├── scrape.py             # Playwright web scraper for job postings
+│   ├── scrape.py             # Jooble API client and mock data generator
 │   ├── transform_load.py     # Pandas + SQLAlchemy ETL pipeline
 │   └── generate_charts.py    # Matplotlib chart generator
 ├── queries/
@@ -47,11 +47,11 @@ ph-job-market-pipeline/
   - [ ] Step 1.5: Draft `db/schema.sql` (DDL with constraints & indexes)
   - [ ] Step 1.6: Launch Docker Container & Verify DB Schema Ingestion
   - [ ] Step 1.7: Git Commit & Merge `feature/db-schema`
-- [ ] **Phase 2: Extract (Web Scraper)**
-  - [ ] Step 2.1: Install Playwright & Chromium Browser Engine
-  - [x] Step 2.2: Implement `src/scrape.py` with mock mode, defensive extraction, and polite rate limits
-  - [ ] Step 2.3: Inspect Target DOM & Calibrate Selectors
-  - [ ] Step 2.4: Execute Scraper & Save Raw Data to `data/raw/`
+- [ ] **Phase 2: Extract (Job APIs)**
+  - [ ] Step 2.1: Register for the Jooble Philippines API and configure `.env`
+  - [x] Step 2.2: Implement `src/scrape.py` with mock mode, Jooble pagination, and defensive API handling
+  - [ ] Step 2.3: Define Jooble search scope and API page limits
+  - [ ] Step 2.4: Execute Jooble collection and save JSON to `data/raw/`
   - [ ] Step 2.5: Verify Raw Data Integrity
   - [ ] Step 2.6: Git Commit & Merge `feature/scraper`
 - [ ] **Phase 3: Transform & Load (ETL Pipeline)**
@@ -81,9 +81,9 @@ ph-job-market-pipeline/
 ### Phase 0: Project Setup & Data Source Decision
 
 #### Step 0.1: Select Data Source & Define Timebox Strategy
-- **Goal**: Lock target job portal (e.g., Kalibrr vs. JobStreet PH).
-- **Timebox**: 3 days maximum for scraping test.
-- **Fallback Rule**: If target blocks IP or returns zero results after 3 days, switch to fallback source with a sample size of 50-80 job postings.
+- **Goal**: Register a Jooble Philippines API key and lock the keyword/location scope.
+- **Timebox**: 3 days maximum for API setup and a 50-record collection test.
+- **Fallback Rule**: If the API key cannot be obtained or the results are insufficient, use the existing manual sample and document the limitation rather than automating an unapproved source.
 
 #### Step 0.2: Initialize Repository & Workspace Folders
 - **Command**:
@@ -114,10 +114,8 @@ ph-job-market-pipeline/
 #### Step 1.3: Define Dependencies & Setup Python Virtual Environment
 - **File**: `requirements.txt`
   ```txt
-  requests==2.32.3
-  beautifulsoup4==4.12.3
-  playwright==1.47.0
-  pandas==2.2.3
+requests==2.32.3
+pandas==2.2.3
   SQLAlchemy==2.0.35
   psycopg2-binary==2.9.9
   python-dotenv==1.0.1
@@ -166,36 +164,33 @@ ph-job-market-pipeline/
 
 ---
 
-### Phase 2: Data Extraction (Scraper Implementation)
+### Phase 2: Data Extraction (Jooble API Integration)
 
-#### Step 2.1: Install Playwright Browsers
-- **Command**:
-  ```bash
-  playwright install chromium
-  ```
+#### Step 2.1: Register and Configure the Jooble Philippines API
+- Register at [Jooble API registration](https://ph.jooble.org/api/about), then add the country-specific key to the untracked `.env` file as `JOOBLE_API_KEY`.
+- Start with the provided `JOOBLE_KEYWORDS`, `JOOBLE_LOCATIONS`, and page-limit values in `.env.example`.
 
 #### Step 2.2: Implement Scraper Script
 - **File**: `src/scrape.py`
 - **Key Features**:
-  - Playwright synchronous API (`sync_playwright`)
-  - Realistic User-Agent string
-  - Randomized request delays (`random.uniform(2, 5)`)
-  - Pagination loop targeting `TARGET_COUNT` (default: 200 jobs)
-  - Detail page scraping for full job descriptions
-  - Defensive error handling (skipping missing elements gracefully)
-  - Output written to `data/raw/raw_jobs_YYYY-MM-DD.json`
+  - Official Jooble REST API requests through `requests`
+  - Keyword/location search scope and bounded pagination
+  - Raw-field normalization for title, company, location, description snippet, salary, source, link, and update date
+  - API-error handling that does not expose the key
+  - Reproducible mock mode for local development
+  - Output written to `data/raw/raw_jobs_YYYY-MM-DDTHHMMSSZ.json`
 
-#### Step 2.3: Calibrate Target DOM Selectors
-- Inspect live job portal elements using Chrome DevTools.
-- Replace placeholder selectors in `scrape.py` (`.job-card`, `.job-title`, `.company-name`, etc.) with target site selectors.
+#### Step 2.3: Define API Search Scope
+- Decide the initial keywords, locations, result count, and page cap in `.env`.
+- Keep the first live run to 50 records and the default three pages per keyword/location to conserve the free API quota.
 
-#### Step 2.4: Execute Scraper
+#### Step 2.4: Execute Jooble Collection
 - **Command**:
   ```bash
-  python src/scrape.py
+  .venv/bin/python src/scrape.py --mode jooble --count 50
   ```
 
-#### Step 2.5: Verify Scraped Data
+#### Step 2.5: Verify API Data
 - Inspect generated JSON file in `data/raw/`.
 - Ensure JSON contains valid array of objects with non-empty titles, companies, URLs, and descriptions.
 
@@ -203,8 +198,8 @@ ph-job-market-pipeline/
 - **Commands**:
   ```bash
   git checkout -b feature/scraper
-  git add src/scrape.py
-  git commit -m "feat: implement web scraper for job postings using playwright"
+  git add src/scrape.py tests/test_scrape.py .env.example requirements.txt README.md
+  git commit -m "feat: add Jooble Philippines API job collection"
   git checkout main
   git merge feature/scraper
   ```

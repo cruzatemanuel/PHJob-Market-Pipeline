@@ -21,8 +21,8 @@ This is the code-level companion to the phase overview: every file you need to w
 ## Prerequisites
 
 - Python 3.12, Docker Desktop, a GitHub account, a Postgres client (DBeaver / TablePlus / `psql`)
-- `pip install playwright && playwright install chromium` if you're scraping a JS-rendered source
-- **This is the same core stack as PhilWeather v2** (Python, pandas, PostgreSQL, SQLAlchemy, matplotlib, GitHub) — Docker is the one piece coming back from v1 here, added deliberately for environment reproducibility, not scope creep. Web scraping and a real branching workflow are the two genuinely new skills this project proves.
+- A Philippines-specific Jooble REST API key from [Jooble API registration](https://ph.jooble.org/api/about)
+- **This is the same core stack as PhilWeather v2** (Python, pandas, PostgreSQL, SQLAlchemy, matplotlib, GitHub) — Docker is the one piece coming back from v1, added deliberately for environment reproducibility. Official API integration and a real branching workflow are the two genuinely new skills this project proves.
 - Since you're already running Claude Code, you can hand it each phase's section below as a task directly — the code blocks are written to be implemented as-is, not just read.
 
 **Timing flag worth checking now:** your semester runs a 17-week structure with synchronized Prelim/Midterm/Final weeks, and Week 4–5 of this build is roughly when Prelims tend to land. Pull up your actual exam schedule before committing to the Week 4 date — if Prelims overlap, front-load Phase 4's SQL queries earlier (they don't depend on anything in Phase 4 beyond a loaded database) so Week 5 is polish-only, not a scramble.
@@ -58,7 +58,7 @@ ph-job-market-pipeline/
 
 ## Phase 0 — Data Source Decision (recap)
 
-Lock this before Week 1. JobStreet PH is JS-rendered and ToS-restricted — Kalibrr is more scrape-tolerant but smaller. If unresolved, default to: attempt your first choice for 3 days max in Week 2, fall back to a smaller (50–80 post) sample from the friendlier source if blocked, and document the decision in the README's Data Source section. Everything below is written source-agnostically so it works either way — only the selectors in `scrape.py` change.
+Use the Jooble Philippines REST API as the primary source. Register for a Philippines-specific key, begin with the provided technology-role and location scope, and cap the first run at 50 records. If the key cannot be obtained or the results are insufficient, use the existing manual sample and document the limitation rather than automating an unapproved source.
 
 ---
 
@@ -94,8 +94,6 @@ POSTGRES_PORT=5433
 ### `requirements.txt`
 ```
 requests==2.32.3
-beautifulsoup4==4.12.3
-playwright==1.47.0
 pandas==2.2.3
 SQLAlchemy==2.0.35
 psycopg2-binary==2.9.9
@@ -193,123 +191,38 @@ Suggested branch per phase: `feature/db-schema` (Wk1) → `feature/scraper` (Wk2
 
 ## Phase 2 (Week 2) — Extract
 
-**Timebox: 3 days.** If your chosen source isn't yielding results by day 3, fall back to Phase 0's smaller-sample plan — don't let this phase eat Week 3.
+**Timebox: 3 days.** Use Jooble's official Philippines API rather than portal scraping. Keep the initial run small: the free key has a finite lifetime request quota, and the first objective is a trustworthy 50-record snapshot, not maximum volume.
+
+### Jooble configuration
+
+1. Register at [Jooble API registration](https://ph.jooble.org/api/about) and copy the Philippines-specific key.
+2. Add `JOOBLE_API_KEY` to the untracked `.env` file. Leave the provided `JOOBLE_*` defaults in place for the first run unless you intentionally change the search scope.
+3. Review the [Jooble REST API documentation](https://help.jooble.org/en/support/solutions/articles/60001448238): the client sends a JSON POST request with `keywords`, `location`, `page`, and `ResultOnPage`, then normalizes the documented job fields into the pipeline's raw format.
 
 ### `src/scrape.py`
-```python
-"""
-scrape.py — Extract job postings from your chosen source.
 
-The selectors below are PLACEHOLDERS. Every job site's DOM differs and changes over
-time — inspect your actual target (DevTools → Inspect Element) and replace every
-TODO before running this for real.
+The implemented client:
 
-Etiquette:
-- Check the target's robots.txt first.
-- Delays between requests are already built in below — don't remove them.
-- A realistic User-Agent is standard practice, not evasion.
-- Consistently blocked? That's your Phase 0 fallback trigger — not a cue to add
-  proxy rotation or CAPTCHA-solving. That crosses from scraping into circumventing
-  a site's protections, which isn't worth it for a portfolio project.
-"""
+- supports deterministic `--mode mock` output for development and tests;
+- uses `--mode jooble` for official API collection;
+- searches configured keyword/location combinations with bounded pagination;
+- preserves title, company, location, description snippet, salary, source, link, update date, and source job ID where Jooble supplies them;
+- skips incomplete records that would violate the downstream ETL contract;
+- de-duplicates jobs by their source link; and
+- reports API request counts without exposing the API key.
 
-import json
-import random
-import time
-from datetime import date
-from pathlib import Path
-from urllib.parse import urljoin
+Run a first live snapshot:
 
-from playwright.sync_api import sync_playwright
-
-SITE_DOMAIN = "https://example-job-site.ph"       # TODO: your source's domain
-BASE_URL = f"{SITE_DOMAIN}/jobs?q=data"            # TODO: your source's search URL
-OUTPUT_DIR = Path("data/raw")
-OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
-TARGET_COUNT = 200          # drop to 50-80 if your source is less cooperative
-DELAY_RANGE = (2, 5)        # seconds between page loads
-
-
-def scrape_listing_page(page, url: str) -> list[dict]:
-    page.goto(url, wait_until="networkidle")
-
-    job_cards = page.query_selector_all(".job-card")   # TODO: real container selector
-
-    results = []
-    for card in job_cards:
-        title = card.query_selector(".job-title")          # TODO
-        company = card.query_selector(".company-name")     # TODO
-        location = card.query_selector(".job-location")    # TODO
-        salary = card.query_selector(".salary-range")      # TODO — often missing, handle None
-        posted = card.query_selector(".posted-date")       # TODO
-        link = card.query_selector("a")                    # TODO
-
-        href = link.get_attribute("href") if link else None
-        results.append({
-            "title": title.inner_text().strip() if title else None,
-            "company": company.inner_text().strip() if company else None,
-            "location": location.inner_text().strip() if location else None,
-            "salary_raw": salary.inner_text().strip() if salary else None,
-            "posted_raw": posted.inner_text().strip() if posted else None,
-            "source_url": urljoin(SITE_DOMAIN, href) if href else None,
-        })
-    return results
-
-
-def scrape_job_detail(page, url: str) -> dict:
-    page.goto(url, wait_until="networkidle")
-    desc_el = page.query_selector(".job-description")   # TODO: real description selector
-    return {"raw_description": desc_el.inner_text().strip() if desc_el else ""}
-
-
-def run():
-    all_jobs = []
-    page_num = 1
-
-    with sync_playwright() as p:
-        browser = p.chromium.launch(headless=True)
-        context = browser.new_context(
-            user_agent=(
-                "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 "
-                "(KHTML, like Gecko) Chrome/128.0 Safari/537.36"
-            )
-        )
-        page = context.new_page()
-
-        while len(all_jobs) < TARGET_COUNT:
-            url = f"{BASE_URL}&page={page_num}"    # TODO: your source's pagination pattern
-            listing_jobs = scrape_listing_page(page, url)
-
-            if not listing_jobs:
-                print(f"No more results at page {page_num}, stopping.")
-                break
-
-            for job in listing_jobs:
-                if job["source_url"]:
-                    job.update(scrape_job_detail(page, job["source_url"]))
-                    time.sleep(random.uniform(*DELAY_RANGE))
-
-            all_jobs.extend(listing_jobs)
-            print(f"Page {page_num}: {len(listing_jobs)} jobs (total: {len(all_jobs)})")
-            page_num += 1
-            time.sleep(random.uniform(*DELAY_RANGE))
-
-        browser.close()
-
-    out_path = OUTPUT_DIR / f"raw_jobs_{date.today().isoformat()}.json"
-    with open(out_path, "w", encoding="utf-8") as f:
-        json.dump(all_jobs[:TARGET_COUNT], f, ensure_ascii=False, indent=2)
-    print(f"Saved {len(all_jobs[:TARGET_COUNT])} postings to {out_path}")
-
-
-if __name__ == "__main__":
-    run()
+```bash
+.venv/bin/python src/scrape.py --mode jooble --count 50
 ```
 
 ### Week 2 exit checklist
-- [ ] `python src/scrape.py` runs end-to-end unattended
-- [ ] `data/raw/` has JSON with at least 50 postings (200 if your source cooperates)
-- [ ] Missing fields (no salary, no description) don't crash the run
+
+- [ ] A Philippines-specific Jooble API key is stored only in `.env`
+- [ ] `.venv/bin/python src/scrape.py --mode jooble --count 50` runs unattended
+- [ ] `data/raw/` has JSON with at least 50 postings
+- [ ] Missing salary or description fields do not crash the run
 
 ---
 
@@ -388,11 +301,16 @@ def parse_salary(raw):
 
 
 def parse_posted_date(raw):
-    """Best-effort parse of relative strings like '3 days ago'. Not required for the
-    5 core queries — included for completeness. Returns None if unparseable."""
+    """Parse Jooble ISO timestamps or relative strings such as '3 days ago'."""
     if not isinstance(raw, str):
         return None
-    raw = raw.lower().strip()
+    raw = raw.strip()
+    try:
+        return datetime.fromisoformat(raw.replace("Z", "+00:00")).date()
+    except ValueError:
+        pass
+
+    raw = raw.lower()
     if "today" in raw:
         return datetime.today().date()
     if (m := re.search(r"(\d+)\s*day", raw)):
@@ -731,7 +649,7 @@ if __name__ == "__main__":
 ```markdown
 # PH Tech Job Market Analytics Pipeline
 
-An ETL pipeline that scrapes tech job postings from [your source], stores them in a
+An ETL pipeline that retrieves tech job postings from the official Jooble Philippines API, stores them in a
 PostgreSQL data warehouse, and answers: **what skills and companies dominate the PH
 data job market?**
 
@@ -744,7 +662,7 @@ data job market?**
 
 \`\`\`mermaid
 flowchart LR
-    A[Job Site] -->|Playwright scraper| B[Raw JSON /data/raw]
+    A[Jooble Philippines API] -->|requests client| B[Raw JSON /data/raw]
     B -->|pandas clean + normalize| C[Transformed DataFrame]
     C -->|SQLAlchemy load| D[(PostgreSQL)]
     D -->|SQL analytics| E[Query Results]
@@ -752,21 +670,21 @@ flowchart LR
 \`\`\`
 
 ## Tech Stack
-Python 3.12 · Playwright/BeautifulSoup · pandas · PostgreSQL · SQLAlchemy · matplotlib · Docker · Git
+Python 3.12 · requests · pandas · PostgreSQL · SQLAlchemy · matplotlib · Docker · Git
 
 ## Data Source & Scope
-[Document your Phase 0 decision: which source, how many postings, why]
+Jooble Philippines API; initial scope of data analyst, data engineer, business intelligence, and software engineer roles across Philippines, Metro Manila, and Cebu; maximum 50 records per initial run.
 
 ## How to Run
 1. Clone the repo
 2. Copy `.env.example` to `.env` and fill in credentials
 3. `docker compose up -d`
 4. `pip install -r requirements.txt`
-5. `playwright install chromium`
-6. `python src/scrape.py`
-7. `python src/transform_load.py`
-8. `python tests/validate_load.py`
-9. `python src/generate_charts.py`
+5. Add the Philippines-specific `JOOBLE_API_KEY` to `.env`
+6. `.venv/bin/python src/scrape.py --mode jooble --count 50`
+7. `.venv/bin/python src/transform_load.py`
+8. `.venv/bin/python tests/validate_load.py`
+9. `.venv/bin/python src/generate_charts.py`
 10. Open `queries/analysis.sql` in your DB client, or run each query against the running container
 
 ## Data Quality Notes
@@ -801,14 +719,14 @@ Then pin the repo on your GitHub profile.
 ## Appendix A — Troubleshooting
 
 - **Port 5432 already in use** → another Postgres is running locally; change the host-side port in `docker-compose.yml` (e.g. `"5433:5432"`) and update `.env`.
-- **`playwright` errors about missing browsers** → run `playwright install chromium`.
+- **Jooble returns HTTP 403** → confirm the key is from the Philippines domain and that its API quota has not been exhausted.
 - **SQLAlchemy "connection refused"** → confirm `docker compose ps` shows the container running, and that `.env` values match `docker-compose.yml`'s environment block.
-- **Scraper returns 0 results** → selectors are likely stale (site changed its DOM) or you're being blocked (check for 403/429 responses). Re-inspect the live page before assuming it's a code bug.
+- **Jooble returns 0 results** → broaden or adjust `JOOBLE_KEYWORDS` and `JOOBLE_LOCATIONS`, then inspect the raw API response before assuming the client is broken.
 - **Schema changes not showing up** → the init script only runs once; `docker compose down -v` then `up -d` to reset the volume.
 
 ## Appendix B — Risk Reminders
 
-- **Week 2 scraper fragility** is still the single biggest point of failure — the 3-day timebox exists to protect Week 3, not to be optional.
+- **Week 2 API readiness** is still the single biggest point of failure — obtain the regional key and validate a 50-record run within the 3-day timebox.
 - **Industry field for Query 4** needs real values in `INDUSTRY_LOOKUP` — it defaults to `'Unclassified'`, which will make Query 4 boring if you forget to populate it after Week 2.
 - **Salary parsing** is a heuristic (`parse_salary`), not a guarantee — spot-check a handful of rows against the raw JSON before trusting Query 2 and 4's numbers.
 - **Exam-week overlap** — see the timing flag under Prerequisites. Check your actual Prelim schedule against Week 4–5 now, not during execution.
