@@ -1,15 +1,15 @@
-"""Collect Philippine job-posting snapshots for the pipeline.
+"""Collect Philippine job-posting snapshots from Jooble's official REST API.
 
-Use ``--mode mock`` for a reproducible offline dataset. Live collection is
-source-agnostic: pass a JSON configuration file with a listing URL template and
-the selectors calibrated for one job board. Do not use live mode until you have
-checked that source's access rules and terms.
+Mock mode creates deterministic data for local testing. Jooble mode sends polite,
+bounded API requests and saves raw, schema-compatible job records for the ETL
+pipeline. The API key stays in ``.env`` and is never written to output or logs.
 """
 
 from __future__ import annotations
 
 import argparse
 import json
+import os
 import random
 import sys
 import time
@@ -17,51 +17,78 @@ from dataclasses import dataclass
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
-from urllib.parse import urljoin
+from urllib.parse import quote
+
+import requests
+
+try:
+    from dotenv import load_dotenv
+except ImportError:  # Mock mode still works before the full requirements install finishes.
+    load_dotenv = None
+else:
+    load_dotenv()
 
 
 DEFAULT_OUTPUT_DIR = Path("data/raw")
 DEFAULT_COUNT = 50
-DEFAULT_TIMEOUT_MS = 30_000
-DEFAULT_USER_AGENT = "PHJobMarketPipeline/1.0 (educational data project)"
-REQUIRED_SELECTORS = ("job_card", "title", "company", "link")
+DEFAULT_TIMEOUT_SECONDS = 30
+DEFAULT_RESULTS_PER_PAGE = 20
+DEFAULT_MAX_PAGES_PER_QUERY = 3
+DEFAULT_REQUEST_DELAY = 0.5
+DEFAULT_API_BASE_URL = "https://ph.jooble.org/api"
+DEFAULT_KEYWORDS = "data analyst,data engineer,business intelligence,software engineer"
+DEFAULT_LOCATIONS = "Philippines,Metro Manila,Cebu"
+
+
+class JoobleApiError(RuntimeError):
+    """Raised for a failed Jooble request without leaking the API key."""
 
 
 @dataclass(frozen=True)
-class LiveScraperConfig:
-    """Settings that vary by job board and are supplied after selector calibration."""
+class JoobleConfig:
+    api_key: str
+    api_base_url: str
+    keywords: tuple[str, ...]
+    locations: tuple[str, ...]
+    results_per_page: int
+    max_pages_per_query: int
+    timeout_seconds: int
+    request_delay: float
 
-    source_name: str
-    listing_url_template: str
-    selectors: dict[str, str]
-    timeout_ms: int = DEFAULT_TIMEOUT_MS
-
-    def url_for_page(self, page_number: int) -> str:
-        return self.listing_url_template.format(page=page_number)
+    @property
+    def endpoint(self) -> str:
+        return f"{self.api_base_url.rstrip('/')}/{quote(self.api_key, safe='')}"
 
 
 def utc_timestamp() -> str:
     return datetime.now(UTC).replace(microsecond=0).isoformat().replace("+00:00", "Z")
 
 
-def text_or_none(locator: Any) -> str | None:
-    """Return normalized locator text without allowing a missing field to stop a run."""
-    if locator is None:
-        return None
-    try:
-        value = locator.inner_text(timeout=1_000).strip()
-    except Exception:  # An optional or changed page element is expected during scraping.
-        return None
-    return value or None
+def parse_csv(value: str, name: str) -> tuple[str, ...]:
+    values = tuple(item.strip() for item in value.split(",") if item.strip())
+    if not values:
+        raise ValueError(f"{name} must contain at least one value.")
+    return values
 
 
-def attribute_or_none(locator: Any, attribute: str) -> str | None:
-    if locator is None:
-        return None
+def env_int(name: str, default: int) -> int:
+    raw_value = os.getenv(name)
+    if raw_value is None:
+        return default
     try:
-        return locator.get_attribute(attribute, timeout=1_000)
-    except Exception:
-        return None
+        return int(raw_value)
+    except ValueError as error:
+        raise ValueError(f"{name} must be an integer.") from error
+
+
+def env_float(name: str, default: float) -> float:
+    raw_value = os.getenv(name)
+    if raw_value is None:
+        return default
+    try:
+        return float(raw_value)
+    except ValueError as error:
+        raise ValueError(f"{name} must be a number.") from error
 
 
 def generate_mock_jobs(count: int, seed: int) -> list[dict[str, str | None]]:
@@ -79,8 +106,6 @@ def generate_mock_jobs(count: int, seed: int) -> list[dict[str, str | None]]:
     companies = ["Northstar PH", "Bayan Analytics", "Manila Data Works", "Cebu Cloud Labs"]
     locations = ["Makati, Philippines", "Taguig, Philippines", "Cebu City, Philippines", "Remote, Philippines"]
     levels = ["Entry Level", "Mid-level", "Senior", "Mid-level"]
-    # A fixed collection time keeps mock-mode output reproducible for tests and demos.
-    timestamp = "2024-01-01T00:00:00Z"
     jobs: list[dict[str, str | None]] = []
 
     for index in range(1, count + 1):
@@ -98,168 +123,145 @@ def generate_mock_jobs(count: int, seed: int) -> list[dict[str, str | None]]:
                 "source_url": f"mock://ph-job-market/{index:04d}",
                 "raw_description": f"{level} {role} role. Requires {skills}",
                 "source": "Synthetic mock data",
-                "scraped_at": timestamp,
+                "scraped_at": "2024-01-01T00:00:00Z",
             }
         )
     return jobs
 
 
-def load_live_config(config_path: Path) -> LiveScraperConfig:
-    """Load and validate the source-specific configuration kept outside the scraper."""
-    try:
-        payload = json.loads(config_path.read_text(encoding="utf-8"))
-    except FileNotFoundError as error:
-        raise ValueError(f"Scraper config not found: {config_path}") from error
-    except json.JSONDecodeError as error:
-        raise ValueError(f"Scraper config is not valid JSON: {error}") from error
-
-    if not isinstance(payload, dict):
-        raise ValueError("Scraper config must be a JSON object.")
-
-    source_name = payload.get("source_name")
-    listing_url_template = payload.get("listing_url_template")
-    selectors = payload.get("selectors")
-    timeout_ms = payload.get("timeout_ms", DEFAULT_TIMEOUT_MS)
-
-    if not isinstance(source_name, str) or not source_name.strip():
-        raise ValueError("Scraper config requires a non-empty 'source_name'.")
-    if not isinstance(listing_url_template, str) or "{page}" not in listing_url_template:
-        raise ValueError("'listing_url_template' must include a '{page}' placeholder.")
-    if not isinstance(selectors, dict):
-        raise ValueError("Scraper config requires a 'selectors' object.")
-
-    missing = [name for name in REQUIRED_SELECTORS if not isinstance(selectors.get(name), str)]
-    if missing:
-        raise ValueError(f"Scraper config is missing required selectors: {', '.join(missing)}")
-    if not isinstance(timeout_ms, int) or timeout_ms < 1_000:
-        raise ValueError("'timeout_ms' must be an integer of at least 1000.")
-
-    clean_selectors = {
-        name: selector.strip()
-        for name, selector in selectors.items()
-        if isinstance(selector, str) and selector.strip()
+def jooble_payload(keyword: str, location: str, page: int, results_per_page: int) -> dict[str, str | int | bool]:
+    """Build one documented Jooble request payload."""
+    return {
+        "keywords": keyword,
+        "location": location,
+        "page": page,
+        "ResultOnPage": results_per_page,
+        "companysearch": False,
     }
-    return LiveScraperConfig(
-        source_name=source_name.strip(),
-        listing_url_template=listing_url_template.strip(),
-        selectors=clean_selectors,
-        timeout_ms=timeout_ms,
-    )
 
 
-def element_text(card: Any, selector: str | None) -> str | None:
-    return text_or_none(card.locator(selector).first) if selector else None
-
-
-def scrape_listing_page(page: Any, config: LiveScraperConfig, page_number: int) -> list[dict[str, str | None]]:
-    """Extract valid listing records from one result page without fetching details."""
-    url = config.url_for_page(page_number)
-    page.goto(url, wait_until="domcontentloaded", timeout=config.timeout_ms)
+def request_jooble_page(
+    session: requests.Session,
+    config: JoobleConfig,
+    keyword: str,
+    location: str,
+    page: int,
+) -> dict[str, Any]:
+    """Request one Jooble page and return its JSON object without exposing credentials."""
     try:
-        cards = page.locator(config.selectors["job_card"])
-        cards.first.wait_for(state="attached", timeout=config.timeout_ms)
-        card_count = cards.count()
-    except Exception as error:
-        print(f"Could not read listing page {page_number}: {error}", file=sys.stderr)
-        return []
-
-    records: list[dict[str, str | None]] = []
-    for index in range(card_count):
-        card = cards.nth(index)
-        title = element_text(card, config.selectors.get("title"))
-        company = element_text(card, config.selectors.get("company"))
-        if not title or not company:
-            continue
-
-        link_selector = config.selectors.get("link")
-        link = card.locator(link_selector).first if link_selector else None
-        href = attribute_or_none(link, "href")
-        if not href:
-            continue
-        records.append(
-            {
-                "title": title,
-                "company": company,
-                "location": element_text(card, config.selectors.get("location")),
-                "salary_raw": element_text(card, config.selectors.get("salary")),
-                "posted_raw": element_text(card, config.selectors.get("posted")),
-                "source_url": urljoin(page.url, href),
-                "raw_description": "",
-                "source": config.source_name,
-                "scraped_at": utc_timestamp(),
-            }
+        response = session.post(
+            config.endpoint,
+            json=jooble_payload(keyword, location, page, config.results_per_page),
+            headers={"Accept": "application/json"},
+            timeout=config.timeout_seconds,
         )
-    return records
+        response.raise_for_status()
+    except requests.HTTPError as error:
+        status = error.response.status_code if error.response is not None else "unknown"
+        raise JoobleApiError(f"Jooble API returned HTTP {status}. Check the regional key and API quota.") from error
+    except requests.RequestException as error:
+        raise JoobleApiError(f"Jooble API request failed ({type(error).__name__}). Check the network connection.") from error
 
-
-def scrape_job_detail(page: Any, source_url: str, config: LiveScraperConfig) -> str:
-    """Fetch an optional job description, returning an empty string on a page error."""
-    description_selector = config.selectors.get("description")
-    if not description_selector:
-        return ""
     try:
-        page.goto(source_url, wait_until="domcontentloaded", timeout=config.timeout_ms)
-        return text_or_none(page.locator(description_selector).first) or ""
-    except Exception as error:
-        print(f"Could not fetch detail page {source_url}: {error}", file=sys.stderr)
-        return ""
+        payload = response.json()
+    except ValueError as error:
+        raise JoobleApiError("Jooble API returned invalid JSON.") from error
+    if not isinstance(payload, dict):
+        raise JoobleApiError("Jooble API returned an unexpected response format.")
+    return payload
 
 
-def run_live(config: LiveScraperConfig, count: int, min_delay: float, max_delay: float, headless: bool) -> list[dict[str, str | None]]:
-    """Run the configured source scraper with modest, non-circumvention delays."""
-    try:
-        from playwright.sync_api import Error as PlaywrightError
-        from playwright.sync_api import sync_playwright
-    except ImportError as error:
-        raise RuntimeError(
-            "Live mode requires Playwright. Install dependencies with "
-            "'.venv/bin/python -m pip install -r requirements.txt'."
-        ) from error
+def string_or_none(value: Any) -> str | None:
+    if not isinstance(value, str):
+        return None
+    value = value.strip()
+    return value or None
 
+
+def normalize_jooble_job(job: Any, query_keyword: str, query_location: str) -> dict[str, str | None] | None:
+    """Map a Jooble job object to the raw-record contract used by transform_load.py."""
+    if not isinstance(job, dict):
+        return None
+
+    title = string_or_none(job.get("title"))
+    company = string_or_none(job.get("company"))
+    source_url = string_or_none(job.get("link"))
+    if not title or not company or not source_url:
+        return None
+
+    source = string_or_none(job.get("source")) or "Jooble"
+    return {
+        "title": title,
+        "company": company,
+        "location": string_or_none(job.get("location")),
+        "salary_raw": string_or_none(job.get("salary")),
+        "posted_raw": string_or_none(job.get("updated")),
+        "source_url": source_url,
+        "raw_description": string_or_none(job.get("snippet")) or "",
+        "source": f"Jooble / {source}",
+        "source_job_id": str(job["id"]) if job.get("id") is not None else None,
+        "job_type": string_or_none(job.get("type")),
+        "query_keyword": query_keyword,
+        "query_location": query_location,
+        "scraped_at": utc_timestamp(),
+    }
+
+
+def collect_jooble_jobs(
+    config: JoobleConfig,
+    max_records: int,
+    session: requests.Session | None = None,
+) -> list[dict[str, str | None]]:
+    """Collect a bounded, de-duplicated Jooble snapshot across the configured scope."""
+    owns_session = session is None
+    session = session or requests.Session()
     jobs: list[dict[str, str | None]] = []
     seen_urls: set[str] = set()
-    page_number = 1
+    request_count = 0
 
-    with sync_playwright() as playwright:
-        browser = playwright.chromium.launch(headless=headless)
-        context = browser.new_context(user_agent=DEFAULT_USER_AGENT)
-        page = context.new_page()
-        try:
-            while len(jobs) < count:
-                try:
-                    listing_jobs = scrape_listing_page(page, config, page_number)
-                except PlaywrightError as error:
-                    print(f"Could not fetch listing page {page_number}: {error}", file=sys.stderr)
-                    break
+    try:
+        for keyword in config.keywords:
+            for location in config.locations:
+                for page in range(1, config.max_pages_per_query + 1):
+                    payload = request_jooble_page(session, config, keyword, location, page)
+                    request_count += 1
+                    raw_jobs = payload.get("jobs", [])
+                    if not isinstance(raw_jobs, list):
+                        raise JoobleApiError("Jooble API response field 'jobs' must be a list.")
 
-                if not listing_jobs:
-                    print(f"No usable listings found on page {page_number}; stopping.")
-                    break
+                    added = 0
+                    for raw_job in raw_jobs:
+                        job = normalize_jooble_job(raw_job, keyword, location)
+                        if job is None or job["source_url"] in seen_urls:
+                            continue
+                        seen_urls.add(job["source_url"])
+                        jobs.append(job)
+                        added += 1
+                        if len(jobs) >= max_records:
+                            break
 
-                added = 0
-                for job in listing_jobs:
-                    source_url = job.get("source_url")
-                    if source_url and source_url in seen_urls:
-                        continue
-                    if source_url:
-                        seen_urls.add(source_url)
-                        job["raw_description"] = scrape_job_detail(page, source_url, config)
-                        time.sleep(random.uniform(min_delay, max_delay))
-                    jobs.append(job)
-                    added += 1
-                    if len(jobs) >= count:
+                    print(
+                        f"{keyword!r} in {location!r}, page {page}: "
+                        f"{added} new posting(s) (total: {len(jobs)})."
+                    )
+                    if len(jobs) >= max_records:
+                        print(f"Jooble API requests used in this run: {request_count}.")
+                        return jobs
+                    total_count = payload.get("totalCount")
+                    is_last_page = (
+                        not raw_jobs
+                        or len(raw_jobs) < config.results_per_page
+                        or (isinstance(total_count, int) and page * config.results_per_page >= total_count)
+                    )
+                    if is_last_page:
                         break
+                    if config.request_delay:
+                        time.sleep(config.request_delay)
+    finally:
+        if owns_session:
+            session.close()
 
-                print(f"Page {page_number}: added {added} posting(s) (total: {len(jobs)})")
-                if added == 0:
-                    print("Page only contained duplicate listings; stopping.")
-                    break
-                page_number += 1
-                if len(jobs) < count:
-                    time.sleep(random.uniform(min_delay, max_delay))
-        finally:
-            context.close()
-            browser.close()
+    print(f"Jooble API requests used in this run: {request_count}.")
     return jobs
 
 
@@ -271,16 +273,46 @@ def write_snapshot(jobs: list[dict[str, str | None]], output_dir: Path) -> Path:
     return output_path
 
 
+def jooble_config_from_args(args: argparse.Namespace) -> JoobleConfig:
+    api_key = os.getenv("JOOBLE_API_KEY", "").strip()
+    if not api_key:
+        raise ValueError("JOOBLE_API_KEY is required for --mode jooble. Add your Philippines-specific key to .env.")
+
+    keywords = parse_csv(args.keywords or os.getenv("JOOBLE_KEYWORDS", DEFAULT_KEYWORDS), "keywords")
+    locations = parse_csv(args.locations or os.getenv("JOOBLE_LOCATIONS", DEFAULT_LOCATIONS), "locations")
+    results_per_page = args.results_per_page or env_int("JOOBLE_RESULTS_PER_PAGE", DEFAULT_RESULTS_PER_PAGE)
+    max_pages = args.max_pages_per_query or env_int("JOOBLE_MAX_PAGES_PER_QUERY", DEFAULT_MAX_PAGES_PER_QUERY)
+    request_delay = args.request_delay if args.request_delay is not None else env_float("JOOBLE_REQUEST_DELAY", DEFAULT_REQUEST_DELAY)
+
+    if results_per_page < 1 or max_pages < 1:
+        raise ValueError("Jooble page-size and page-limit values must be at least 1.")
+    if request_delay < 0:
+        raise ValueError("JOOBLE_REQUEST_DELAY must not be negative.")
+
+    return JoobleConfig(
+        api_key=api_key,
+        api_base_url=os.getenv("JOOBLE_API_BASE_URL", DEFAULT_API_BASE_URL).strip(),
+        keywords=keywords,
+        locations=locations,
+        results_per_page=results_per_page,
+        max_pages_per_query=max_pages,
+        timeout_seconds=args.timeout_seconds,
+        request_delay=request_delay,
+    )
+
+
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description="Collect a raw PH job-market JSON snapshot.")
-    parser.add_argument("--mode", choices=("mock", "live"), default="mock", help="Use reproducible mock data or a configured live source (default: mock).")
-    parser.add_argument("--count", type=int, default=DEFAULT_COUNT, help=f"Maximum records to collect (default: {DEFAULT_COUNT}).")
+    parser.add_argument("--mode", choices=("mock", "jooble"), default="mock", help="Use reproducible mock data or the Jooble API (default: mock).")
+    parser.add_argument("--count", type=int, default=DEFAULT_COUNT, help=f"Maximum records to write (default: {DEFAULT_COUNT}).")
     parser.add_argument("--output-dir", type=Path, default=DEFAULT_OUTPUT_DIR, help=f"Snapshot directory (default: {DEFAULT_OUTPUT_DIR}).")
     parser.add_argument("--seed", type=int, default=42, help="Random seed for mock data (default: 42).")
-    parser.add_argument("--config", type=Path, help="Source-specific JSON configuration; required for --mode live.")
-    parser.add_argument("--min-delay", type=float, default=2.0, help="Minimum live-mode pause in seconds (default: 2).")
-    parser.add_argument("--max-delay", type=float, default=5.0, help="Maximum live-mode pause in seconds (default: 5).")
-    parser.add_argument("--show-browser", action="store_true", help="Show Chromium while using live mode.")
+    parser.add_argument("--keywords", help="Comma-separated Jooble keywords; overrides JOOBLE_KEYWORDS.")
+    parser.add_argument("--locations", help="Comma-separated Jooble locations; overrides JOOBLE_LOCATIONS.")
+    parser.add_argument("--results-per-page", type=int, help="Jooble results per request; overrides JOOBLE_RESULTS_PER_PAGE.")
+    parser.add_argument("--max-pages-per-query", type=int, help="Jooble page cap per keyword/location; overrides JOOBLE_MAX_PAGES_PER_QUERY.")
+    parser.add_argument("--request-delay", type=float, help="Seconds between Jooble requests; overrides JOOBLE_REQUEST_DELAY.")
+    parser.add_argument("--timeout-seconds", type=int, default=DEFAULT_TIMEOUT_SECONDS, help=f"HTTP request timeout (default: {DEFAULT_TIMEOUT_SECONDS}).")
     return parser
 
 
@@ -288,19 +320,13 @@ def main(argv: list[str] | None = None) -> int:
     args = build_parser().parse_args(argv)
     if args.count < 1:
         raise SystemExit("--count must be at least 1")
-    if args.min_delay < 0 or args.max_delay < args.min_delay:
-        raise SystemExit("Delay values must be non-negative and --max-delay must be at least --min-delay.")
+    if args.timeout_seconds < 1:
+        raise SystemExit("--timeout-seconds must be at least 1")
 
-    if args.mode == "mock":
-        jobs = generate_mock_jobs(args.count, args.seed)
-    else:
-        if args.config is None:
-            raise SystemExit("--config is required when --mode live.")
-        try:
-            config = load_live_config(args.config)
-            jobs = run_live(config, args.count, args.min_delay, args.max_delay, not args.show_browser)
-        except (RuntimeError, ValueError) as error:
-            raise SystemExit(str(error)) from error
+    try:
+        jobs = generate_mock_jobs(args.count, args.seed) if args.mode == "mock" else collect_jooble_jobs(jooble_config_from_args(args), args.count)
+    except (JoobleApiError, ValueError) as error:
+        raise SystemExit(str(error)) from error
 
     output_path = write_snapshot(jobs, args.output_dir)
     print(f"Saved {len(jobs)} posting(s) to {output_path}")

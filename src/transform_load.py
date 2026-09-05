@@ -69,11 +69,20 @@ def parse_salary(raw):
 
 
 def parse_posted_date(raw):
-    """Best-effort parse of relative strings like '3 days ago'. Not required for the
-    5 core queries — included for completeness. Returns None if unparseable."""
+    """Parse Jooble ISO timestamps or relative strings such as '3 days ago'.
+
+    Returns ``None`` for unparseable source values. Posting date is not required
+    for the five core queries, but preserving it makes raw snapshots auditable.
+    """
     if not isinstance(raw, str):
         return None
-    raw = raw.lower().strip()
+    raw = raw.strip()
+    try:
+        return datetime.fromisoformat(raw.replace("Z", "+00:00")).date()
+    except ValueError:
+        pass
+
+    raw = raw.lower()
     if "today" in raw:
         return datetime.today().date()
     if (m := re.search(r"(\d+)\s*day", raw)):

@@ -23,7 +23,7 @@ ph-job-market-pipeline/
 ├── db/
 │   └── schema.sql          # Relational PostgreSQL/SQLite DDL schema & pre-seeded taxonomy
 ├── src/
-│   ├── scrape.py           # Job scraper & mock data generator engine
+│   ├── scrape.py           # Jooble API client & mock data generator
 │   ├── transform_load.py   # ETL pipeline (JSON parsing, salary normalization, skill extraction, DB loading)
 │   └── generate_charts.py  # Market intelligence chart visualization engine
 ├── queries/
@@ -37,7 +37,7 @@ ph-job-market-pipeline/
 
 ## 💡 Key Features
 
-- **Ingestion Engine (`src/scrape.py`)**: Collects job metadata including titles, salary ranges (PHP & USD), work setup (Remote, Hybrid, On-site), locations (Metro Manila, Cebu, Davao, Clark), and experience levels into timestamped raw JSON snapshots. Includes synthetic mock mode for reproducible offline testing.
+- **Ingestion Engine (`src/scrape.py`)**: Retrieves structured job metadata from the official Jooble Philippines REST API, including title, company, location, description snippet, salary when available, source, link, and update date. Includes synthetic mock mode for reproducible offline testing.
 - **Automated ETL Pipeline (`src/transform_load.py`)**:
   - **Currency Normalization**: Converts USD salaries to PHP equivalents (`USD_TO_PHP_RATE`).
   - **Regional Standardization**: Maps location strings to key PH hiring hubs.
@@ -53,7 +53,7 @@ ph-job-market-pipeline/
 
 ### 1. Prerequisites
 
-- Python 3.9–3.12 (the pinned Playwright and PostgreSQL driver releases do not support Python 3.13)
+- Python 3.9–3.12
 - Docker & Docker Compose (Optional, for PostgreSQL container)
 
 ### 2. Environment Setup
@@ -96,33 +96,19 @@ Run the scraper module to fetch raw job listings and save a snapshot in `data/ra
 python src/scrape.py --mode mock --count 50
 ```
 
-For live collection, complete selector calibration first and keep the
-source-specific settings in a local JSON file. The URL must contain `{page}` and
-the `job_card`, `title`, `company`, and `link` selectors must match the chosen
-portal:
-
-```json
-{
-  "source_name": "Chosen PH job portal",
-  "listing_url_template": "https://portal.example/jobs?q=data&page={page}",
-  "selectors": {
-    "job_card": ".actual-job-card",
-    "title": ".actual-title",
-    "company": ".actual-company",
-    "location": ".actual-location",
-    "salary": ".actual-salary",
-    "posted": ".actual-posted-date",
-    "link": "a.actual-job-link",
-    "description": ".actual-description"
-  }
-}
-```
-
-After checking the portal's terms and robots policy, run:
+For live data, register for a Philippines-specific Jooble API key at
+[Jooble API registration](https://ph.jooble.org/api/about), then add it to your
+untracked `.env` file as `JOOBLE_API_KEY`. The default scope is four technology
+roles across Philippines, Metro Manila, and Cebu; customize the `JOOBLE_*`
+settings in `.env` before running:
 
 ```bash
-.venv/bin/python src/scrape.py --mode live --config path/to/portal.json --count 50
+.venv/bin/python src/scrape.py --mode jooble --count 50
 ```
+
+The script paginates each keyword/location search, de-duplicates by job link,
+and limits each query to three pages by default to conserve Jooble's API quota.
+See the [official API documentation](https://help.jooble.org/en/support/solutions/articles/60001448238) for API terms, response fields, and regional-key requirements.
 
 ### Step 2: Transform & Load (ETL)
 Parse the raw JSON snapshot, clean fields, extract skill keywords, and load records into the database:
